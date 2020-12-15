@@ -88,6 +88,54 @@ class Sequence(object):
 
         self.p = p
         self.model = model
+        
+    def fit_elmo(self, x_train, y_train, x_valid=None, y_valid=None,
+            epochs=1, batch_size=32, verbose=1, callbacks=None, shuffle=True):
+        """Fit the model for a fixed number of epochs.
+
+        Args:
+            x_train: list of training data.
+            y_train: list of training target (label) data.
+            x_valid: list of validation data.
+            y_valid: list of validation target (label) data.
+            batch_size: Integer.
+                Number of samples per gradient update.
+                If unspecified, `batch_size` will default to 32.
+            epochs: Integer. Number of epochs to train the model.
+            verbose: Integer. 0, 1, or 2. Verbosity mode.
+                0 = silent, 1 = progress bar, 2 = one line per epoch.
+            callbacks: List of `keras.callbacks.Callback` instances.
+                List of callbacks to apply during training.
+            shuffle: Boolean (whether to shuffle the training data
+                before each epoch). `shuffle` will default to True.
+        """
+        p = ELMoTransformer(initial_vocab=self.initial_vocab, use_char=self.use_char)
+        p.fit(x_train, y_train)
+        embeddings = filter_embeddings(self.embeddings, p._word_vocab.vocab, self.word_embedding_dim)
+
+        model = ELModel(char_vocab_size=p.char_vocab_size,
+                          word_vocab_size=p.word_vocab_size,
+                          num_labels=p.label_size,
+                          word_embedding_dim=self.word_embedding_dim,
+                          char_embedding_dim=self.char_embedding_dim,
+                          word_lstm_size=self.word_lstm_size,
+                          char_lstm_size=self.char_lstm_size,
+                          fc_dim=self.fc_dim,
+                          dropout=self.dropout,
+                          embeddings=embeddings,
+                          use_char=self.use_char,
+                          use_crf=self.use_crf)
+        model, loss = model.build()
+        model.compile(loss=loss, optimizer=self.optimizer)
+
+        trainer = Trainer(model, preprocessor=p)
+        trainer.train(x_train, y_train, x_valid, y_valid,
+                      epochs=epochs, batch_size=batch_size,
+                      verbose=verbose, callbacks=callbacks,
+                      shuffle=shuffle)
+
+        self.p = p
+        self.model = model        
 
     def predict(self, x_test):
         """Returns the prediction of the model on the given test data.
