@@ -1,5 +1,6 @@
 """Training-related module.
 """
+from keras.callbacks import EarlyStopping
 from anago.callbacks import F1score
 from anago.utils import NERSequence
 
@@ -42,7 +43,8 @@ class Trainer(object):
         if x_valid and y_valid:
             valid_seq = NERSequence(x_valid, y_valid, batch_size, self._preprocessor.transform)
             f1 = F1score(valid_seq, preprocessor=self._preprocessor)
-            callbacks = [f1] + callbacks if callbacks else [f1]
+            es = EarlyStopping(monitor='loss', mode='min', verbose=1)
+            callbacks = [f1,es] + callbacks if callbacks else [f1,es]
 
         self._model.fit_generator(generator=train_seq,
                                   epochs=epochs,
